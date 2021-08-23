@@ -126,7 +126,7 @@ jobs:
           ```
           ${{ env.WARNING_MSG }}
           ```
-    - name: Report and quit
+    - name: Final report
       run: |
         if test "${{ steps.check-commits.outputs.has_error_msg }}" = "yes"
         then
