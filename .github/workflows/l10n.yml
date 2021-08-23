@@ -62,7 +62,7 @@ jobs:
           commit_to=${{ github.event.after }}
           if ! echo $commit_from | grep -q "^00*$"
           then
-            if ! git rev-parse "$commit_from^{commit}"
+            if ! git rev-parse --verify --end-of-options "$commit_from^{commit}" --
             then
               git fetch origin $commit_from
             fi
