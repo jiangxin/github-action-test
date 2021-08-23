@@ -26181,3 +26181,4 @@ msgstr "您真的要傳送 %s？[y|N]："
 #, sh-format
 #~ msgid "Bad rev input: $arg"
 #~ msgstr "壞的輸入版本：$arg"
+#
