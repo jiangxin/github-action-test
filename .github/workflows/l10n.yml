@@ -69,9 +69,12 @@ jobs:
           fi
         fi
         exit_code=0
-        git-po-helper check-commits --github-action -- \
-          $commit_from..$commit_to >git-po-helper.out 2>&1 ||
-        exit_code=$?
+        git-po-helper \
+            check-commits \
+            --github-action \
+            --github-action-event "${{ github.event_name }}" -- \
+            $commit_from..$commit_to >git-po-helper.out 2>&1 ||
+          exit_code=$?
         echo "::set-output name=exit_code::$exit_code"
         has_error_msg=
         has_warning_msg=
