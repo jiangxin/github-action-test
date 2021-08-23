@@ -1,6 +1,6 @@
 name: git-l10n
 
-on: [push, pull_request]
+on: [push, pull_request_target]
 
 jobs:
   ci-config:
@@ -53,7 +53,7 @@ jobs:
     - id: check-commits
       name: Run git-po-helper
       run: |
-        if test "${{ github.event_name }}" = "pull_request"
+        if test "${{ github.event_name }}" = "pull_request_target"
         then
           commit_from=${{ github.event.pull_request.base.sha }}
           commit_to=${{ github.event.pull_request.head.sha }}
@@ -81,7 +81,7 @@ jobs:
         if test $exit_code -ne 0
         then
           has_error_msg=yes
-          if test "${{ github.event_name }}" = "pull_request"
+          if test "${{ github.event_name }}" = "pull_request_target"
           then
             echo "ERROR_MSG<<EOF" >>$GITHUB_ENV
             grep -v -e "^level=warning" -e WARNING git-po-helper.out |
@@ -92,7 +92,7 @@ jobs:
         if grep -q -e "^level=warning" -e WARNING git-po-helper.out
         then
           has_warning_msg=yes
-          if test "${{ github.event_name }}" = "pull_request"
+          if test "${{ github.event_name }}" = "pull_request_target"
           then
             echo "WARNING_MSG<<EOF" >>$GITHUB_ENV
             grep -v -e "^level=error" -e ERROR git-po-helper.out |
@@ -104,7 +104,7 @@ jobs:
         echo "::set-output name=has_warning_msg::$has_warning_msg"
     - name: Report errors in comment for pull request
       uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.has_error_msg == 'yes' && github.event_name == 'pull_request'
+      if: steps.check-commits.outputs.has_error_msg == 'yes' && github.event_name == 'pull_request_target'
       continue-on-error: true
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -116,7 +116,7 @@ jobs:
           ```
     - name: Report warnings in comment for pull request
       uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.has_warning_msg == 'yes' && github.event_name == 'pull_request'
+      if: steps.check-commits.outputs.has_warning_msg == 'yes' && github.event_name == 'pull_request_target'
       continue-on-error: true
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
