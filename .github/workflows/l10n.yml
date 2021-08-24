@@ -1,6 +1,6 @@
 name: git-l10n
 
-on: [push, pull_request]
+on: [push, pull_request_target]
 
 jobs:
   ci-config:
@@ -40,6 +40,32 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: '0'
+
+    - name: Fetch missing commits
+      id: fetch-commits
+      run: |
+        if test "${{ github.event_name }}" = "pull_request_target"
+        then
+          base=${{ github.event.pull_request.base.sha }}
+          head=${{ github.event.pull_request.head.sha }}
+        else
+          base=${{ github.event.before }}
+          head=${{ github.event.after }}
+        fi
+        for commit in $base $head
+        do
+          if echo $commit | grep -q "^00*$"
+          then
+            continue
+          fi
+          if ! git rev-parse --verify --end-of-options "$commit^{commit}" --
+          then
+            git fetch origin $commit
+          fi
+        done
+        echo "::set-output name=base::$base"
+        echo "::set-output name=head::$head"
+
     - uses: actions/setup-go@v2
       with:
         go-version: ">=1.16"
@@ -50,30 +76,15 @@ jobs:
       run: |
         sudo apt-get update -q &&
         sudo apt-get install -q -y gettext
-    - id: check-commits
-      name: Run git-po-helper
+    - name: Run git-po-helper
+      id: check-commits
       run: |
-        if test "${{ github.event_name }}" = "pull_request"
-        then
-          commit_from=${{ github.event.pull_request.base.sha }}
-          commit_to=${{ github.event.pull_request.head.sha }}
-        else
-          commit_from=${{ github.event.before }}
-          commit_to=${{ github.event.after }}
-          if ! echo $commit_from | grep -q "^00*$"
-          then
-            if ! git rev-parse --verify --end-of-options "$commit_from^{commit}" --
-            then
-              git fetch origin $commit_from
-            fi
-          fi
-        fi
         exit_code=0
-        git-po-helper \
-            check-commits \
+        git-po-helper check-commits \
             --github-action \
             --github-action-event "${{ github.event_name }}" -- \
-            $commit_from..$commit_to >git-po-helper.out 2>&1 ||
+            ${{ steps.fetch-commits.outputs.base }}..${{ steps.fetch-commits.outputs.head }} \
+            >git-po-helper.out 2>&1 ||
           exit_code=$?
         echo "::set-output name=exit_code::$exit_code"
         has_error_msg=
@@ -81,7 +92,7 @@ jobs:
         if test $exit_code -ne 0
         then
           has_error_msg=yes
-          if test "${{ github.event_name }}" = "pull_request"
+          if test "${{ github.event_name }}" = "pull_request_target"
           then
             echo "ERROR_MSG<<EOF" >>$GITHUB_ENV
             grep -v -e "^level=warning" -e WARNING git-po-helper.out |
@@ -92,7 +103,7 @@ jobs:
         if grep -q -e "^level=warning" -e WARNING git-po-helper.out
         then
           has_warning_msg=yes
-          if test "${{ github.event_name }}" = "pull_request"
+          if test "${{ github.event_name }}" = "pull_request_target"
           then
             echo "WARNING_MSG<<EOF" >>$GITHUB_ENV
             grep -v -e "^level=error" -e ERROR git-po-helper.out |
@@ -104,7 +115,7 @@ jobs:
         echo "::set-output name=has_warning_msg::$has_warning_msg"
     - name: Report errors in comment for pull request
       uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.has_error_msg == 'yes' && github.event_name == 'pull_request'
+      if: steps.check-commits.outputs.has_error_msg == 'yes' && github.event_name == 'pull_request_target'
       continue-on-error: true
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -116,7 +127,7 @@ jobs:
           ```
     - name: Report warnings in comment for pull request
       uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.has_warning_msg == 'yes' && github.event_name == 'pull_request'
+      if: steps.check-commits.outputs.has_warning_msg == 'yes' && github.event_name == 'pull_request_target'
       continue-on-error: true
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -126,7 +137,7 @@ jobs:
           ```
           ${{ env.WARNING_MSG }}
           ```
-    - name: Report and quit
+    - name: Final report
       run: |
         if test "${{ steps.check-commits.outputs.has_error_msg }}" = "yes"
         then
