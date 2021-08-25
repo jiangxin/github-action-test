@@ -95,11 +95,12 @@ jobs:
           perl -pe 's/\e\[[0-9;]*m//g; s/\bEOF$//g' git-po-helper.out >>$GITHUB_ENV
           echo "EOF" >>$GITHUB_ENV
         fi
-        echo "::set-output name=exit_code::$exit_code"
         echo "::set-output name=create_comment::$create_comment"
+        cat git-po-helper.out
+        exit $exit_code
     - name: Report in comment for pull request
       uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.create_comment== 'yes' && github.event_name == 'pull_request_target'
+      if: (success() || failure()) && steps.check-commits.outputs.create_comment== 'yes' && github.event_name == 'pull_request_target'
       continue-on-error: true
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -109,7 +110,3 @@ jobs:
           ```
           ${{ env.COMMENT_BODY }}
           ```
-    - name: Final report
-      run: |
-        cat git-po-helper.out
-        exit ${{ steps.check-commits.outputs.exit_code }}
