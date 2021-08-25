@@ -81,77 +81,35 @@ jobs:
       id: check-commits
       run: |
         exit_code=0
+        create_comment=
         git-po-helper check-commits \
             --github-action-event="${{ github.event_name }}" -- \
             ${{ steps.fetch-commits.outputs.base }}..${{ steps.fetch-commits.outputs.head }} \
             >git-po-helper.out 2>&1 ||
           exit_code=$?
+        if test $exit_code -ne 0 ||
+           grep -q -e "^level=warning" -e WARNING git-po-helper.out
+        then
+          create_comment=yes
+          echo "COMMENT_BODY<<EOF" >>$GITHUB_ENV
+          perl -pe 's/\e\[[0-9;]*m//g; s/\bEOF$//g' git-po-helper.out >>$GITHUB_ENV
+          echo "EOF" >>$GITHUB_ENV
+        fi
         echo "::set-output name=exit_code::$exit_code"
-        has_error_msg=
-        has_warning_msg=
-        if test $exit_code -ne 0
-        then
-          has_error_msg=yes
-          if test "${{ github.event_name }}" = "pull_request_target"
-          then
-            echo "ERROR_MSG<<EOF" >>$GITHUB_ENV
-            grep -v -e "^level=warning" -e WARNING git-po-helper.out |
-              perl -pe 's/\e\[[0-9;]*m//g; s/\bEOF$//g' >>$GITHUB_ENV
-            echo "EOF" >>$GITHUB_ENV
-          fi
-        fi
-        if grep -q -e "^level=warning" -e WARNING git-po-helper.out
-        then
-          has_warning_msg=yes
-          if test "${{ github.event_name }}" = "pull_request_target"
-          then
-            echo "WARNING_MSG<<EOF" >>$GITHUB_ENV
-            grep -v -e "^level=error" -e ERROR git-po-helper.out |
-              perl -pe 's/\e\[[0-9;]*m//g; s/\bEOF$//g' >>$GITHUB_ENV
-            echo "EOF" >>$GITHUB_ENV
-          fi
-        fi
-        echo "::set-output name=has_error_msg::$has_error_msg"
-        echo "::set-output name=has_warning_msg::$has_warning_msg"
-    - name: Report errors in comment for pull request
+        echo "::set-output name=create_comment::$create_comment"
+    - name: Report in comment for pull request
       uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.has_error_msg == 'yes' && github.event_name == 'pull_request_target'
+      if: steps.check-commits.outputs.create_comment== 'yes' && github.event_name == 'pull_request_target'
       continue-on-error: true
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         repo-token-user-login: 'github-actions[bot]'
         message: |
-          Errors found by git-po-helper in workflow ${{ github.workflow }}:
+          Errors or warnings found by git-po-helper in workflow ${{ github.workflow }}:
           ```
-          ${{ env.ERROR_MSG }}
-          ```
-    - name: Report warnings in comment for pull request
-      uses: mshick/add-pr-comment@v1
-      if: steps.check-commits.outputs.has_warning_msg == 'yes' && github.event_name == 'pull_request_target'
-      continue-on-error: true
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        repo-token-user-login: 'github-actions[bot]'
-        message: |
-          Warnings found by git-po-helper in workflow ${{ github.workflow }}:
-          ```
-          ${{ env.WARNING_MSG }}
+          ${{ env.COMMENT_BODY }}
           ```
     - name: Final report
       run: |
-        if test "${{ steps.check-commits.outputs.has_error_msg }}" = "yes"
-        then
-          echo "::group::Errors found by git-po-helper"
-          grep -v -e "^level=warning" -e WARNING git-po-helper.out
-          echo "::endgroup::"
-        fi
-        if test "${{ steps.check-commits.outputs.has_warning_msg }}" = "yes"
-        then
-          echo "::group::Warnings found by git-po-helper"
-          grep -v -e "^level=error" -e ERROR git-po-helper.out
-          echo "::endgroup::"
-        fi
-        if test ${{ steps.check-commits.outputs.exit_code }} -ne 0
-        then
-          exit ${{ steps.check-commits.outputs.exit_code }}
-        fi
+        cat git-po-helper.out
+        exit ${{ steps.check-commits.outputs.exit_code }}
