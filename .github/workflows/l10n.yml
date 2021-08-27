@@ -3,31 +3,10 @@ name: git-l10n
 on: [push, pull_request_target]
 
 jobs:
-  l10n-config:
-    runs-on: ubuntu-latest
-    outputs:
-      enabled: ${{ steps.check-repo-name.outputs.matched == 'yes' || steps.check-file-exists.outputs.exists }}
-    steps:
-      - id: check-repo-name
-        name: Check repo name
-        run: |
-          matched=no
-          if ${{ endsWith(github.repository, '/git-po') }}
-          then
-            matched=yes
-          fi
-          echo "::set-output name=matched::$matched"
-      - id: check-file-exists
-        name: Check file in branch
-        if: steps.check-repo-name.outputs.matched != 'yes'
-        uses: jiangxin/file-exists-action@v1
-        with:
-          ref: ci-config
-          path: ci/config/allow-l10n
-
   git-po-helper:
-    needs: l10n-config
-    if: needs.l10n-config.outputs.enabled == 'true'
+    env:
+      GIT_L10N_ENABLED: ${{ secrets.GIT_L10N_ENABLED }}
+    if: endsWith(github.repository, '/git-po')
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -62,8 +41,8 @@ jobs:
             esac
           done
           # Unshallow the repository, and fetch missing commits.
-          # "$base" is missing for a force push, and "$head" is
-          # missing for the "pull_request_target" event.
+          # "$base" may be missing due to forced push, and "$head"
+          # may be missing due to the "pull_request_target" event.
           git fetch --unshallow origin $args
           echo "::set-output name=base::$base"
           echo "::set-output name=head::$head"
