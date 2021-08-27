@@ -4,7 +4,7 @@ on: [push, pull_request_target]
 
 jobs:
   git-po-helper:
-    if: endsWith(github.repository, '/git-po') || contains(github.head_ref, 'l10n/') || contains(github.ref, 'l10n/')
+    if: endsWith(github.repository, '/git-po') || contains(github.head_ref, 'l10n') || contains(github.ref, 'l10n')
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
