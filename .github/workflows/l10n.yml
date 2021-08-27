@@ -2,16 +2,18 @@ name: git-l10n
 
 on: [push, pull_request_target]
 
+env:
+  GIT_L10N_ENABLED: ${{ secrets.GIT_L10N_ENABLED }}
+
 jobs:
   git-po-helper:
-    env:
-      GIT_L10N_ENABLED: ${{ secrets.GIT_L10N_ENABLED }}
     if: endsWith(github.repository, '/git-po')
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
       - uses: actions/checkout@v2
+        if: env.GIT_L10N_ENABLED == 'true'
         with:
           fetch-depth: '1'
       - name: Fetch missing commits
