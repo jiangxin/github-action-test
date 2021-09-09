@@ -27,6 +27,7 @@ jobs:
           echo "::set-output name=head::$head"
       - name: Run partial clone
         run: |
+          set -x
           git -c init.defaultBranch=master init --bare .
           git remote add \
             --mirror=fetch \
