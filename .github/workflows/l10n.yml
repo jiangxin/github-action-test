@@ -3,7 +3,7 @@ name: git-l10n
 on: [push, pull_request]
 
 jobs:
-  git-po-helper:
+  git-po-helper2:
     if: >-
       endsWith(github.repository, '/git-po') ||
       contains(github.head_ref, 'l10n') ||
