@@ -1,0 +1,51 @@
+name: git-pot
+
+on: push
+  #schedule:
+  #  - cron:  '10 5,17 * * *'
+
+jobs:
+  git-pot:
+    strategy:
+      matrix:
+        branch: [master]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone ${{ matrix.branch }} branch of current repository
+        run: |
+          git clone --single-branch --branch pot/${{ matrix.branch }} \
+            https://github.com/${{ github.repository }} git-po &&
+          (
+            cd git-po &&
+            git config user.name "git-pot rebot" &&
+            git config user.email "no-reply@example.com" &&
+            git config diff.gettext-uniq.cachetextconv true &&
+            git config diff.gettext-uniq.textconv "msguniq -i --no-location --strict -s" &&
+            printf "*.po  diff=gettext-uniq\n" >>.git/info/attributes &&
+            printf "*.pot diff=gettext-uniq\n" >>.git/info/attributes
+          )
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q &&
+          sudo apt-get install -q -y gettext
+      - name: Clone git repository
+        run: |
+          git clone --filter=blob:none --single-branch --branch ${{ matrix.branch }} \
+            https://github.com/git/git.git git
+      - name: Check changes of po/git.pot
+        run: |
+          make -C git pot &&
+          cp git/po/git.pot git-po/po/git.pot &&
+          (
+            cd git-po &&
+            fn=$(date "+%Y-%m-%d").diff &&
+            git diff -- po/git.pot >"$fn" &&
+            if test -s "$fn"; then
+              git add po/git.pot "$fn" &&
+              git commit -m "l10n: changes on po/git.pot from ${{ matrix.branch }} branch" &&
+              git push https://jiangxin:${{ secrets.API_TOKEN_GITHUB }}@github.com/${{ github.repository }} HEAD
+            else
+              echo >&2 "ERROR: git.pot is not changed" &&
+              exit 1
+            fi
+          )
