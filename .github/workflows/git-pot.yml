@@ -8,7 +8,7 @@ jobs:
   git-pot:
     strategy:
       matrix:
-        branch: [master]
+        branch: [master, next, seen]
     runs-on: ubuntu-latest
     steps:
       - name: Clone ${{ matrix.branch }} branch of current repository
@@ -17,6 +17,7 @@ jobs:
             https://github.com/${{ github.repository }} git-po &&
           (
             cd git-po &&
+            mkdir -p po &&
             git config user.name "git-pot rebot" &&
             git config user.email "no-reply@example.com" &&
             git config diff.gettext-uniq.cachetextconv true &&
@@ -35,7 +36,7 @@ jobs:
       - name: Check changes of po/git.pot
         run: |
           make -C git pot &&
-          cp git/po/git.pot git-po/po/git.pot &&
+          sed '/^"POT-Creation-Date: / d' git/po/git.pot git-po/po/git.pot &&
           (
             cd git-po &&
             fn=$(date "+%Y-%m-%d").diff &&
@@ -43,7 +44,7 @@ jobs:
             if test -s "$fn"; then
               git add po/git.pot "$fn" &&
               git commit -m "l10n: changes on po/git.pot from ${{ matrix.branch }} branch" &&
-              git push https://jiangxin:${{ secrets.API_TOKEN_GITHUB }}@github.com/${{ github.repository }} HEAD
+              git push https://jiangxin:${{ secrets.PUSH_TOKEN }}@github.com/${{ github.repository }} HEAD
             else
               echo >&2 "ERROR: git.pot is not changed" &&
               exit 1
